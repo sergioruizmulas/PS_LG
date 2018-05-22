@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script src="http://ajax.googleapis.com/ajax/libs/jquery/1/jquery.min.js"></script>
+<script src="https://code.highcharts.com/highcharts.js"></script>
+<script>
+var Ejercicio2 = function () {
+	this.dataseries=new Array();
+    this.seriesLine = new Array();
+    this.seriesPie = new Array();
+    $.ajaxSetup({
+        async: false
+    });
+};
+
+// Se cargan los datos
+Ejercicio2.prototype.load = function () {
+    var objThis = this;
+	$.getJSON('http://s3.amazonaws.com/logtrust-static/test/test/data1.json', function (data) {
+		objThis.validateData1(data);
+    });
+    $.getJSON('http://s3.amazonaws.com/logtrust-static/test/test/data2.json', function (data) {
+        objThis.validateData2(data);
+    });
+    $.getJSON('http://s3.amazonaws.com/logtrust-static/test/test/data3.json', function (data) {
+        objThis.validateData3(data);
+    });
+	objThis.addData();
+};
+
+Ejercicio2.prototype.crearSeriedataseries=function (data) {
+	this.dataseries.push(data);
+}
+
+Ejercicio2.prototype.validateData1 = function (data1) {
+    for (var i = 0; i < data1.length; i++) {
+		this.crearSeriedataseries({
+            category: data1[i].cat.toUpperCase(), 
+            name: data1[i].d, 
+            data: data1[i].value
+        });
+    }
+};
+
+Ejercicio2.prototype.validateData2 = function (data2) {
+    for (var i = 0; i < data2.length; i++) {
+		this.crearSeriedataseries({
+            category: data2[i].categ.toUpperCase(),
+            name: Date.parse(data2[i].myDate),
+            data: data2[i].val
+        });
+    }
+};
+
+Ejercicio2.prototype.validateData3 = function (data3) {
+    for (var i = 0; i < data3.length; i++) {
+        var regex = /\d\d\d\d-(0[1-9]|1[012])-(0[1-9]|[1-2][0-9]|3[0-1])/
+		
+		this.crearSeriedataseries({
+            category: (data3[i].raw.split('#'))[1].toUpperCase(), 
+		    name: Date.parse(regex.exec(data3[i].raw)[0]), 
+			data: data3[i].val
+        });
+    }
+};
+
+Ejercicio2.prototype.distinctCategorys = function(arr){
+    var categorias = [];
+    for(var i=0; i < arr.length; i++){
+        if(categorias.indexOf(arr[i].category) == -1)
+              categorias.push(arr[i].category);  
+    }
+    return categorias;
+};
+
+
+Ejercicio2.prototype.indiceArray = function (val, array) { 
+  for (var i = 0; i < array.length; i++) 
+  {
+    if (array[i][0]=== val) 
+	{
+        return i;
+    }
+  }
+  return -1;
+};
+
+// Se acumulan las tres series
+Ejercicio2.prototype.addData = function () {
+	var aggregatedCat = {
+            categorys:  new Array(),
+            total: 0
+        };
+	var uniquecategorys=this.distinctCategorys(this.dataseries);
+	for(var i=0;i<uniquecategorys.length;i++)
+	{
+		var categoryBucle=uniquecategorys[i]
+		var category = {
+            name: categoryBucle,
+            total: 0
+        };
+		this.seriesLine.push({
+			name: categoryBucle,
+			data: new Array()
+		});
+		var seriecategory=$.grep(this.dataseries, function( n, i ) {
+			return n.category===categoryBucle;
+			});
+//		seriecategory.sort(function (a, b) { return a["name"] - b["name"] });
+		for (var j = 0; j < seriecategory.length; j++) 
+		{
+			var indiceExiste=this.indiceArray(seriecategory[j].name,this.seriesLine[i].data)
+			if (indiceExiste>-1)
+			{
+				this.seriesLine[i].data[indiceExiste][1] +=seriecategory[j].data;	
+			}
+			else
+			{
+				this.seriesLine[i].data.push([seriecategory[j].name,seriecategory[j].data]);
+			}	
+			category.total += seriecategory[j].data;
+		}
+		aggregatedCat.categorys.push(category);
+        aggregatedCat.total += category.total;
+		this.seriesLine[i].data.sort(function(a,b){return a[0] - b[0]});
+	}
+	 var 	highchartPieSerie = {
+        name: "categorys",
+        data: new Array()
+    };
+	for (var i = 0; i < aggregatedCat.categorys.length; i++) 
+	{
+		highchartPieSerie.data.push({
+            name: aggregatedCat.categorys[i].name,
+            y: (aggregatedCat.categorys[i].total / aggregatedCat.total) * 100
+        });
+	}
+	this.seriesPie.push(highchartPieSerie);
+};
+
+// Se representan gráficamente
+Ejercicio2.prototype.HighChartLines = function (containerId) {
+    $("#" + containerId).highcharts({
+     title: {
+        text: 'Ejercicio 2'
+    },
+    subtitle: {
+        text: ''
+    },
+    yAxis: {
+        title: {
+            text: 'Values'
+        }
+    },
+    xAxis: {
+        type: 'datetime',
+        title: {
+            text: 'Date'
+        }
+    },
+    legend: {
+        layout: 'vertical',
+        align: 'right',
+        verticalAlign: 'middle'
+    },
+    plotOptions: {
+        series: {
+            label: {
+                connectorAllowed: false
+            },
+        }
+    },
+     series: this.seriesLine
+    });
+};
+
+Ejercicio2.prototype.HighChartPie = function (containerId) {
+    $("#" + containerId).highcharts({
+    chart: {
+      plotBackgroundColor: null,
+      plotBorderWidth: null,
+      plotShadow: false,
+      type: 'pie'
+    },
+    title: {
+      text: 'Ejercicio 2'
+    },
+    tooltip: {
+      pointFormat: '{series.name}: <b>{point.percentage:.1f}%</b>'
+    },
+    plotOptions: {
+      pie: {
+        allowPointSelect: true,
+        cursor: 'pointer',
+        dataLabels: {
+          enabled: true,
+          format: '<b>{point.name}</b>: {point.percentage:.1f} %',
+          style: {
+            color: (Highcharts.theme && Highcharts.theme.contrastTextColor) || 'black'
+          }
+        }
+      }
+    },	
+	series: this.seriesPie
+    });
+};
+
+$(document).ready(function () {
+    var a = new Ejercicio2();
+    a.load();
+    a.HighChartLines("containerLine");
+    a.HighChartPie("containerPie");
+});
+</script>
+</head>
+<body>
+    <div id="containerLine"></div>
+    <div id="containerPie"></div>
+</body>
+</html>
